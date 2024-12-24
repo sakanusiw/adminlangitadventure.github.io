@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore'; // Untuk mendapatkan data pengguna dari Firestore
+import { db } from '../index'; // Import Firestore instance
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -11,23 +13,38 @@ const Login = () => {
 
     const Auth = async (e) => {
         e.preventDefault();
+        setMsg(''); // Reset pesan error
 
         try {
-            // Sign in with Firebase Auth
-            await signInWithEmailAndPassword(auth, email, password);
+            // Sign in dengan Firebase Auth
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
 
-            // Redirect user after successful login
-            navigate('/dashboard');
+            // Periksa role pengguna di Firestore
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+
+                if (userData.role === 'admin') {
+                    navigate('/dashboard'); // Redirect ke dashboard jika admin
+                } else {
+                    setMsg('Akses ditolak. Anda bukan admin.');
+                    await auth.signOut(); // Logout jika bukan admin
+                }
+            } else {
+                setMsg('Data pengguna tidak ditemukan.');
+                await auth.signOut(); // Logout jika data tidak ditemukan
+            }
         } catch (error) {
-            setMsg("Failed to sign in. Please check your email and password.");
-            console.error("Error signing in: ", error);
+            setMsg('Gagal login. Periksa email dan password Anda.');
+            console.error('Error saat login:', error);
         }
     };
 
     return (
         <>
             {/* Login Form UI */}
-            <html className="flex items-center justify-center min-h-screen bg-slate-700">
+            <html className="flex items-center justify-center min-h-screen bg-blue-950">
                 <body className="h-full">
                     <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8 bg-slate-100 rounded-lg">
                         <div className="sm:mx-auto sm:w-full sm:max-w-sm">
@@ -65,11 +82,11 @@ const Login = () => {
                                     />
                                 </div>
 
-                                <div className="flex justify-end">
+                                {/* <div className="flex justify-end">
                                     <a href="/forgotPassword" className="text-indigo-600">
                                         Forgot password?
                                     </a>
-                                </div>
+                                </div> */}
 
                                 <div>
                                     <button type="submit" className="w-full bg-indigo-600 text-white rounded-md px-3 py-1.5">
@@ -78,9 +95,9 @@ const Login = () => {
                                 </div>
                             </form>
 
-                            <p className="mt-10 text-center">
+                            {/* <p className="mt-10 text-center">
                                 Don't have an account? <a href="/dashboard" className="text-indigo-600">Register</a>
-                            </p>
+                            </p> */}
                         </div>
                     </div>
                 </body>
